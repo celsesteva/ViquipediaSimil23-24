@@ -100,20 +100,112 @@ object exampleMapreduce extends App {
 
   // Fem el shutdown del actor system
   println("shutdown")
-  systema.terminate()
+  //systema.terminate()
   println("ended shutdown")
   // com tancar el sistema d'actors.
 
   /*
   EXERCICIS:
+  */
+  //Useu el MapReduce per saber quant ha gastat cada persona.
+  def mappingGastat(supers: String, persones: List[(String,Double, String)]) :List[(String, Double)] = {
+    persones.map(p => (p._1, p._2))
+  }
 
-  Useu el MapReduce per saber quant ha gastat cada persona.
+  def reducingGastat(persona: String, gastat: List[Double]): (String,Double) = {
+    (persona, gastat.sum)
+  }
 
-  Useu el MapReduce per saber qui ha fet la compra més cara a cada supermercat
+  println("Creem l'actor MapReduce per fer el gastat Count")
+  val gastatcount = systema.actorOf(Props(new MapReduce(compres,mappingGastat, reducingGastat)), name = "mastergastat")
 
-  Useu el MapReduce per saber quant s'ha gastat cada dia a cada supermercat.
-   */
+  // L'implicit permet fixar el timeout per a la pregunta que enviem al wordcount. És obligagori.
+  var futureresutltgastatcount = gastatcount ? mapreduce.MapReduceCompute()
 
+  println("Awaiting")
+  // En acabar el MapReduce ens envia un missatge amb el resultat
+  val gastatCountResult:Map[String,Double] = Await.result(futureresutltgastatcount,Duration.Inf).asInstanceOf[Map[String,Double]]
+
+
+  println("My Results Obtained")
+  for(v<-gastatCountResult) println("-> " + v)
+
+
+
+
+
+
+  //Useu el MapReduce per saber qui ha fet la compra més cara a cada supermercat
+
+
+
+
+
+
+  def mappingMaxGastat(supers: String, compra: List[(String,Double, String)]) : List[(String,(String,Double))] = {
+    compra.map(p =>  (supers,(p._1,p._2)))
+  }
+
+  def reducingMaxGastat(supers: String, gastat: List[(String,Double)]): (String,(String,Double)) = {
+    val persona = gastat.filter(_._2.equals(gastat.sortWith(_._2>_._2).head._2)).head;
+    (supers, (persona._1,persona._2));
+  }
+
+  println("Creem l'actor MapReduce per fer el gastat Count")
+  val gastatMaxcount = systema.actorOf(Props(new MapReduce(compres,mappingMaxGastat, reducingMaxGastat)), name = "mastermaxgastat")
+
+  // L'implicit permet fixar el timeout per a la pregunta que enviem al wordcount. És obligagori.
+  var futureresutltMaxgastatcount = gastatMaxcount ? mapreduce.MapReduceCompute()
+
+  println("Awaiting")
+  // En acabar el MapReduce ens envia un missatge amb el resultat
+  val maxgastatCountResult:Map[String,Double] = Await.result(futureresutltMaxgastatcount,Duration.Inf).asInstanceOf[Map[String,Double]]
+
+
+  println("My Results Obtained")
+  for(v<-maxgastatCountResult) println("-> -> " + v)
+
+
+
+
+
+
+
+  //Useu el MapReduce per saber quant s'ha gastat cada dia a cada supermercat.
+
+
+
+
+
+
+
+  def mappingGastatDia(supers: String, compra: List[(String,Double, String)]) : List[(String,(String,Double))] = {
+    compra.map(p => (supers, (p._3, p._2)))
+  }
+
+  def reducingGastatDia(supers: String, gastat: List[(String,Double)]): (String,Map[String,Double]) = {
+    val resultat = gastat.groupBy(_._1).map {
+      case (dia, transaccions) => (dia, transaccions.map(_._2).sum)
+    }
+    (supers,resultat)
+  }
+
+  println("Creem l'actor MapReduce per fer el gastat Count")
+  val gastatcountDia = systema.actorOf(Props(new MapReduce(compres,mappingGastatDia, reducingGastatDia)), name = "mastergastatdia")
+
+  // L'implicit permet fixar el timeout per a la pregunta que enviem al wordcount. És obligagori.
+  var futureresutltgastatcountDia = gastatcountDia ? mapreduce.MapReduceCompute()
+
+  println("Awaiting")
+  // En acabar el MapReduce ens envia un missatge amb el resultat
+  val diagastatCountResult:Map[String,Double] = Await.result(futureresutltgastatcountDia,Duration.Inf).asInstanceOf[Map[String,Double]]
+
+
+  println("My Results Obtained")
+  for(v<-diagastatCountResult) println("-> -> -> " + v)
+
+
+  systema.terminate()
 
   println("tot enviat, esperant... a veure si triga en PACO")
 }
