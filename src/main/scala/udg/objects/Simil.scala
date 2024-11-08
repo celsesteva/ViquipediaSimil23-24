@@ -87,8 +87,6 @@ object Simil {
   def paraulafreqfreq(input: String): Unit = {
     val words = freq(input);
     val frequencies = words.groupBy(_._2).map(input => (input._1,input._2.size)).toList.sortWith((a,b) => a._2 > b._2 || (a._2 == b._2 && a._1 < b._1)); //.sortWith((a,b) => a._2 > b._2), sortWith {case  ((_,nu1), (_,nu2)) => nu1 > nu2}
-    println(words.groupBy(_._2))
-    println(words.groupBy(_._2).map(input => (input._1,input._2.size)));
     //frequencies: primer agrupo words per el numero d'aparicions.
     //despres transformo el hashMap que esta agrupat per el numero d'aparicions i faig que en lloc de ser aparicions -> List((String,apariconis),(String2,aparcions)),...) sigui aparcions -> aparcions.size)
     //per tant obting el numero de aparcions de cada paraula -> total de paraules amb aquest numero d'aparicons.
