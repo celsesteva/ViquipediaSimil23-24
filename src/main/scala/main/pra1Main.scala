@@ -13,20 +13,10 @@ object Main extends App {
     val files = new File(path);
     files.listFiles.filter(f => f.isFile && f.getName.endsWith(".txt")).map(f => f.getPath.mkString).toList;
   }
-
-
-  //TODO: fer que vagi rapid. ////////////---------------- FET
-  //TODO: fer que faci tots amb tots PER A totes les funcions.
-  //TODO: fer document.
-  //TODO: commentate.
-  /*
-  Lliurament
- Les pr`actiques es poden fer en equips de dos.
- Cal que documenteu el codi.
- Lliurareu un document amb el codi de cada apartat i exemples d’execuci´o aix´ı com les
-taules de resultats de les comparacions finals.
- Properament es publicar`a la segona part de la pr`actica i les instruccions de lliurament.
-   */
+  def getListOfFilesNames(path: String): List[String] = {
+    val files = new File(path);
+    files.listFiles.filter(f => f.isFile && f.getName.endsWith(".txt")).map(f => f.getName.mkString).toList;
+  }
 
   //exmeples de la pràctica que es demanen.
   val fileAliceInWonderland = "primeraPartPractica/pg11.txt"
@@ -47,39 +37,116 @@ taules de resultats de les comparacions finals.
   val fileAliceInWonderlandContents2 = Source.fromFile(fileAliceInWonderland2).mkString
   //5: Vector space model:
   println(Simil.cosinesim(fileAliceInWonderlandContents,fileAliceInWonderlandContents2,Simil.normalize(fileStopWordsContents),1))
+  println();
   //tots els exemples de la pràctcia fets.
 
 
+  //agafo els paths de les carpetes.
   val filesPath = "primeraPartPractica/";
-
   val filesList = getListOfFiles(filesPath);
-
   val stopFiles: List[String] = filesList.filter(_.contains("stop"));
-  println(stopFiles)
   val files: List[String] = filesList.filterNot(_.contains("stop"));
-  println(files);
+  val filesNamesAll: List[String] = getListOfFilesNames(filesPath);
+  val stopNames: List[String] = filesNamesAll.filter(_.contains("stop"));
+  val fileNames: List[String] = filesNamesAll.filterNot(_.contains("stop"));
 
-  val filePathPg11 = "primeraPartPractica/pg11.txt"
-  val fileContentsPg11 = Source.fromFile(filePathPg11).mkString
-  val filePathPg12 = "primeraPartPractica/pg12.txt"
-  val fileContentsPg12 = Source.fromFile(filePathPg12).mkString
-  val filePathPg74 = "primeraPartPractica/pg74.txt"
-  val fileContentsPg74 = Source.fromFile(filePathPg74).mkString
-  val filePathPg2500 = "primeraPartPractica/pg2500-net.txt"
-  val fileContentsPg2500 = Source.fromFile(filePathPg2500).mkString
+  //obting els stopWords.
+  val stopWords = Simil.normalize(Source.fromFile(stopFiles.head).mkString); //I will just do it with english-stop words.
+
+  //funció per a calcular tots els cosinesims.
+  def calculateAllCosinesim(files: List[String],stopWords: List[String], n: Int): List[Float] = {
+    val result = for (first <- files; second <- files) yield {
+      val x = Source.fromFile(first).mkString;
+      val y = Source.fromFile(second).mkString;
+      Simil.cosinesim(x,y,stopWords,n);
+    }
+    result;
+  }
+
+  //fa el print de cuadricula.
+  def printResults(fileNames: List[String], values: List[List[Float]]): Unit = (fileNames, values) match {
+    case (Nil, _) => println("Empty file names")
+    case (head :: tail, Nil) => println("Empty values list")
+    case (fileNames, head :: tail) =>
+      // Fa print dels noms de les columnes.
+      println(f"${" " * 20} | " + fileNames.map(f => f"$f%-20s").mkString(" | ")) //fa print de fileNames, però abans el tranforma a l'output adequat.
+      println("-" * (fileNames.size * 24 + 5)) // Just to make the separator line
+
+      // Fa el print de les files amb el nom de la fila.
+      fileNames.zip(values).foreach { case (rowName, similarities) =>
+        println(f"$rowName%-20s | " +
+          similarities.map(sim => f"$sim%-20.4f").mkString(" | "))
+      }
+  }
 
 
-  val filePathStop = "primeraPartPractica/english-stop.txt"
-  val fileContentsStop = Source.fromFile(filePathStop).mkString
+  //ara ho faig 5 cops per a trobar els resultats.
+  var before = System.nanoTime;
+  var n: Int = 1;
+  var result = calculateAllCosinesim(files,stopWords,n);
+  var totalTime=System.nanoTime-before
 
-  val stopWords = Simil.normalize(fileContentsStop);
+  println("Time " + totalTime / 1000000 + "ms")
+  println("Using " + stopNames.head + s" and a window of $n:")
+  var listOfLists: List[List[Float]] = result.grouped(files.size).toList;
+  printResults(fileNames,listOfLists);
+  println()
+  println()
 
-  //println(Simil.nonstopfreq(fileContentsPg11,stopWords.distinct).sortWith(_._2 > _._2))
 
-  //println(Simil.freq(fileContents))
-  //Simil.paraulafreqfreq(fileContentsPg11);
-  Simil.printWindow(Simil.ngrames(fileContentsPg11,3).sortWith(_._2 > _._2).take(10),10);
-  //println(Simil.freq(fileContentsPg11))
-  //println(Simil.nonstopfreq(fileContentsPg11,Simil.normalize(fileContentsStop)))
-  println(Simil.cosinesim(fileContentsPg11,fileContentsPg12,stopWords,1));
+
+  before = System.nanoTime;
+  n = n+1;
+  result = calculateAllCosinesim(files,stopWords,n);
+  totalTime=System.nanoTime-before
+
+  println("Time " + totalTime / 1000000 + "ms")
+  println("Using " + stopNames.head + s" and a window of $n:")
+  listOfLists = result.grouped(files.size).toList;
+  printResults(fileNames,listOfLists);
+  println()
+  println()
+
+
+
+
+  before = System.nanoTime;
+  n = n+1;
+  result = calculateAllCosinesim(files,stopWords,n);
+  totalTime=System.nanoTime-before
+
+  println("Time " + totalTime / 1000000 + "ms")
+  println("Using " + stopNames.head + s" and a window of $n:")
+  listOfLists = result.grouped(files.size).toList;
+  printResults(fileNames,listOfLists);
+  println()
+  println()
+
+
+
+  before = System.nanoTime;
+  n = n+1;
+  result = calculateAllCosinesim(files,stopWords,n);
+  totalTime=System.nanoTime-before
+
+  println("Time " + totalTime / 1000000 + "ms")
+  println("Using " + stopNames.head + s" and a window of $n:")
+  listOfLists = result.grouped(files.size).toList;
+  printResults(fileNames,listOfLists);
+  println()
+  println()
+
+
+
+  before = System.nanoTime;
+  n = n+1;
+  result = calculateAllCosinesim(files,stopWords,n);
+  totalTime=System.nanoTime-before
+
+  println("Time " + totalTime / 1000000 + "ms")
+  println("Using " + stopNames.head + s" and a window of $n:")
+  listOfLists = result.grouped(files.size).toList;
+  printResults(fileNames,listOfLists);
+  println()
+  println()
 }
