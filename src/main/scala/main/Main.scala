@@ -183,12 +183,9 @@ object exampleMapreduce extends App {
     compra.map(p => ((supers,p._3), (p._2)))
   }
 
-  def reducingGastatDia(supers: Serializable, gastat: List[(Double)]): ((String,String),Double) = {
+  def reducingGastatDia(supers: (String,String), gastat: List[(Double)]): ((String,String),Double) = {
     println(supers + " " + gastat)
-    supers match {
-      case (supermercat: String, day: String) =>
-        ((supermercat, day), gastat.sum)
-    }
+    ((supers._1,supers._2),gastat.sum)
   }
 
   println("Creem l'actor MapReduce per fer el gastat Count")
