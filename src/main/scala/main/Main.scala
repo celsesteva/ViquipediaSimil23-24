@@ -147,7 +147,7 @@ object exampleMapreduce extends App {
   }
 
   def reducingMaxGastat(supers: String, gastat: List[(String,Double)]): (String,(String,Double)) = {
-    val persona = gastat.filter(_._2.equals(gastat.sortWith(_._2>_._2).head._2)).head;
+    val persona = gastat.maxBy(_._2);
     (supers, (persona._1,persona._2));
   }
 
@@ -179,15 +179,16 @@ object exampleMapreduce extends App {
 
 
 
-  def mappingGastatDia(supers: String, compra: List[(String,Double, String)]) : List[(String,(String,Double))] = {
-    compra.map(p => (supers, (p._3, p._2)))
+  def mappingGastatDia(supers: String, compra: List[(String,Double, String)]): List[((String,String),Double)] = {
+    compra.map(p => ((supers,p._3), (p._2)))
   }
 
-  def reducingGastatDia(supers: String, gastat: List[(String,Double)]): (String,Map[String,Double]) = {
-    val resultat = gastat.groupBy(_._1).map {
-      case (dia, transaccions) => (dia, transaccions.map(_._2).sum)
+  def reducingGastatDia(supers: Serializable, gastat: List[(Double)]): ((String,String),Double) = {
+    println(supers + " " + gastat)
+    supers match {
+      case (supermercat: String, day: String) =>
+        ((supermercat, day), gastat.sum)
     }
-    (supers,resultat)
   }
 
   println("Creem l'actor MapReduce per fer el gastat Count")
