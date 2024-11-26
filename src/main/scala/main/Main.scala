@@ -35,8 +35,8 @@ object tractaxml extends App {
 
 object exampleMapreduce extends App {
 
-  val nmappers = 1
-  val nreducers = 1
+  val nmappers = 2
+  val nreducers = 2
   val f1 = new java.io.File("f1")
   val f2 = new java.io.File("f2")
   val f3 = new java.io.File("f3")
@@ -184,7 +184,6 @@ object exampleMapreduce extends App {
   }
 
   def reducingGastatDia(supers: (String,String), gastat: List[(Double)]): ((String,String),Double) = {
-    println(supers + " " + gastat)
     ((supers._1,supers._2),gastat.sum)
   }
 
