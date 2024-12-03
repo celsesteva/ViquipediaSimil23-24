@@ -9,6 +9,7 @@ import mapreduce._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import mr._
 import scala.language.postfixOps
 
 // Tenim dos objectes executables
@@ -196,7 +197,6 @@ object exampleMapreduce extends App {
   println("Awaiting")
   // En acabar el MapReduce ens envia un missatge amb el resultat
   val diagastatCountResult:Map[String,Double] = Await.result(futureresutltgastatcountDia,Duration.Inf).asInstanceOf[Map[String,Double]]
-
 
   println("My Results Obtained")
   for(v<-diagastatCountResult) println("-> -> -> " + v)

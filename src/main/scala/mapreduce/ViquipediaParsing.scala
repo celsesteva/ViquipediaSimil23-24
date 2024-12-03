@@ -1,5 +1,7 @@
-package mapreduce
+package mr
 
+import java.io.FileInputStream
+import javax.xml.stream.XMLInputFactory
 import scala.util.matching.Regex
 import scala.xml.{Elem, XML}
 
@@ -15,16 +17,40 @@ object ViquipediaParse {
   def testParse= this.parseViquipediaFile(exampleFilename)
 
   def parseViquipediaFile(filename: String=this.exampleFilename) = {
-    val xmlleg = new java.io.InputStreamReader(new java.io.FileInputStream(filename), "UTF-8")
+    val inputStream = new FileInputStream(filename)
+    val factory = XMLInputFactory.newInstance()
+    val reader = factory.createXMLStreamReader(inputStream)
+    var contingut: String = null;
+    var titol: String = null;
 
-    // Agafo el document XML i ja està internament estructurat per anar accedint als camps que volguem
-    val xmllegg: Elem = XML.load(xmlleg)
 
-    // obtinc el titol
-    val titol = (xmllegg \\ "title").text
+    while (reader.hasNext) {
+      reader.next() match {
+        case javax.xml.stream.XMLStreamConstants.START_ELEMENT =>
+          val localName = reader.getLocalName
+          if (localName == "title") {
+            titol = reader.getElementText;
+          } else if (localName == "text") {
+            contingut = reader.getElementText;
+          }
+        case _ => // Do nothing
+      }
+      reader.close();
+    }
 
-    // obtinc el contingut de la pàgina
-    val contingut = (xmllegg \\ "text").text
+
+
+
+    //val xmlleg = new java.io.InputStreamReader(new java.io.FileInputStream(filename), "UTF-8")
+
+    //// Agafo el document XML i ja està internament estructurat per anar accedint als camps que volguem
+    //val xmllegg: Elem = XML.load(xmlleg)
+
+    //// obtinc el titol
+    //val titol = (xmllegg \\ "title").text
+
+    //// obtinc el contingut de la pàgina
+    //val contingut = (xmllegg \\ "text").text
 
     // identifico referències
     val ref = new Regex("\\[\\[[^\\]]*\\]\\]")
@@ -33,15 +59,22 @@ object ViquipediaParse {
     //println(contingut)
     val refs = (ref findAllIn contingut).toList
 
+    val disallowedChars = Set(':', '#')
+    val disallowedPattern = "[:#]".r
+
     // elimino les que tenen :
-    val filteredRefs = refs.filterNot(_.contains(':'))
+    //val filteredRefs = refs.filterNot(ref => disallowedChars.exists(c => ref.contains(c)))
+    val filteredRefs = refs.filterNot(ref => disallowedPattern.findFirstIn(ref).isDefined)
+
+    //elimino [[, | i ]]
+    val cleanedRefs = filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).filterNot(_.equals(titol)).distinct; //removes repetits
 
     // caldrà eliminar-ne més?
 
     //for (r <- refs) println(r)
     //println(refs.length)
     //println(filteredRefs.length)
-    xmlleg.close()
-    ResultViquipediaParsing(titol, contingut, filteredRefs)
+    //xmlleg.close()
+    ResultViquipediaParsing(titol, contingut, cleanedRefs)
   }
 }
