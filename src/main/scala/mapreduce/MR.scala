@@ -60,7 +60,7 @@ class Reducer[K2,V2,V3](reducing:(K2,List[V2])=> (K2,V3)) extends Actor {
 class MR[K1,V1,K2,V2,V3](
                           input:List[(K1,List[V1])],
                           mapping:(K1,List[V1]) => List[(K2,V2)],
-                          reducing:(K2,List[V2])=> (K2,V3),
+                          reducing:(K2,List[V2])=> (K2,V3), //el index del reducer és el de retorn.
                           mappers: Int = 1,
                           reducers: Int = 1) extends Actor {
 
@@ -88,7 +88,6 @@ class MR[K1,V1,K2,V2,V3](
   var nreducers = 0 // adaptar per poder tenir menys reducers
   var fromReducersPendents = 0
 
-  var num_files_mapper = 0
   // dict serà el diccionari amb el resultat intermedi
   var dict: Map[K2, List[V2]] = Map[K2, List[V2]]() withDefaultValue List()
   // resultatFinal recollirà les respostes finals dels reducers
@@ -163,6 +162,7 @@ class MR[K1,V1,K2,V2,V3](
         // pel constructor del Reducer amb paràmetres
         nreducers = Math.max(Math.min(dict.size,maxReducers),1);
         fromReducersPendents = dict.size // actualitzem els reducers pendents
+        //TODO: quan hi ha 0 (dict.size == 0) es queda penjat. Això quan (A,List())
         val reducers = for (i <- 0 until nreducers) yield
           context.actorOf(Props(new Reducer(reducing)), "reducer"+i)
         // No cal anotar els tipus ja que els infereix de la funció reducing

@@ -67,7 +67,9 @@ object ViquipediaParse {
     val filteredRefs = refs.filterNot(ref => disallowedPattern.findFirstIn(ref).isDefined)
 
     //elimino [[, | i ]]
+    //TODO: PETA, SPLIT ESTA BUIT, FAIG MALAMENT, EM PETO COSES QUE POTSER NO TOQUEN, ETC....
     val cleanedRefs = filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).filterNot(_.equals(titol)).distinct; //removes repetits
+    //FILTERNOT: he de treure el titol?
 
     // caldrà eliminar-ne més?
 
