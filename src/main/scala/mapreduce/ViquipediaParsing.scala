@@ -64,11 +64,15 @@ object ViquipediaParse {
 
     // elimino les que tenen :
     //val filteredRefs = refs.filterNot(ref => disallowedChars.exists(c => ref.contains(c)))
-    val filteredRefs = refs.filterNot(ref => disallowedPattern.findFirstIn(ref).isDefined)
+    val filteredRefs = refs.filterNot(ref => disallowedPattern.findFirstIn(ref).isDefined).filterNot(_.isEmpty)
 
     //elimino [[, | i ]]
     //TODO: PETA, SPLIT ESTA BUIT, FAIG MALAMENT, EM PETO COSES QUE POTSER NO TOQUEN, ETC....
-    val cleanedRefs = filteredRefs//filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).filterNot(_.equals(titol)).distinct; //removes repetits
+    val cleanedRefs = filteredRefs
+      .map(ref => ref.split("\\[\\[|\\]\\]|\\|"))
+      .collect { case parts if parts.length > 1 => parts(1) } // Only collect if there's a second part
+      .filterNot(_.equals(titol))
+      .distinct
     //PETA EN EL EXEMPLE exampleFilename.
     //FILTERNOT: he de treure el titol?
 

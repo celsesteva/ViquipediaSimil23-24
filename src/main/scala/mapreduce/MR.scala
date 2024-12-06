@@ -20,13 +20,19 @@ object MRWrapper{
                                reducing:(K2,List[V2])=> (K2,V3),
                                mappers: Int = 1,
                                reducers: Int = 1, nomSystema:String ="sistema", nomMaster: String ="master"): Map[K2, V3] = {
-    val systema: ActorSystem = ActorSystem(nomSystema)
-    val actor = systema.actorOf(Props(new MR(input, mapping, reducing, mappers, reducers)), name = nomMaster)
-    implicit val timeout = Timeout(10000000 seconds)
-    val future = actor ? mr.MapReduceCompute()
-    val map: Map[K2, V3] = Await.result(future, Duration.Inf).asInstanceOf[Map[K2, V3]]
-    systema.terminate()
-    map
+    //TODO: MIRAR SI EL IF HA DE SER AQUI.
+    if(input.nonEmpty) {
+      val systema: ActorSystem = ActorSystem(nomSystema)
+      val actor = systema.actorOf(Props(new MR(input, mapping, reducing, mappers, reducers)), name = nomMaster)
+      implicit val timeout = Timeout(10000000 seconds)
+      val future = actor ? mr.MapReduceCompute()
+      val map: Map[K2, V3] = Await.result(future, Duration.Inf).asInstanceOf[Map[K2, V3]]
+      systema.terminate()
+      map
+    }
+    else{
+      Map[K2,V3]();
+    }
   }
 }
 
@@ -44,7 +50,7 @@ class Mapper[K1,V1,K2,V2](mapping:(K1,List[V1]) => List[(K2,V2)]) extends Actor 
     // de vincular d'alguna manera perquè sinó l'inferidor de tipus no sap a quin dels paràmetres de tipus del mapper correspon el tipus de la clau
     // i el tipus del valor al missatge toMapper
     case toMapper(clau:K1,valor:List[V1])=>
-      sender ! fromMapper(mapping(clau,valor))
+        sender ! fromMapper(mapping(clau,valor))
   }
 }
 
@@ -134,7 +140,7 @@ class MR[K1,V1,K2,V2,V3](
       //for(i<- 0 until nmappers) mappers(i) ! toMapper(input(i)._1:K1, input(i)._2: List[V1])
 
       for(((p1,p2),i)<- input.zipWithIndex) {
-        mappers(i % nmappers) ! toMapper(p1: K1, p2 :List[V1]) //mappers.foreach(_ ! toMapper(p1: K1, p2 :List[V1]))
+          mappers(i % nmappers) ! toMapper(p1: K1, p2 :List[V1]) //mappers.foreach(_ ! toMapper(p1: K1, p2 :List[V1]))
       }
 
       // Per tant, alternativament...
@@ -155,6 +161,7 @@ class MR[K1,V1,K2,V2,V3](
 
       fromMappersPendents -= 1
 
+      //TODO també peta quan selecciones 2 1 a 1
       // Quan ja hem rebut tots els missatges dels mappers:
       if (fromMappersPendents==0)
       {
@@ -162,16 +169,24 @@ class MR[K1,V1,K2,V2,V3](
         // pel constructor del Reducer amb paràmetres
         nreducers = Math.max(Math.min(dict.size,maxReducers),1);
         fromReducersPendents = dict.size // actualitzem els reducers pendents
+        if(dict.nonEmpty) {
         //TODO: quan hi ha 0 (dict.size == 0) es queda penjat. Això quan (A,List()), es penja amb test_viqui
-        val reducers = for (i <- 0 until nreducers) yield
-          context.actorOf(Props(new Reducer(reducing)), "reducer"+i)
+          val reducers = for (i <- 0 until nreducers) yield
+            context.actorOf(Props(new Reducer(reducing)), "reducer" + i)
+
         // No cal anotar els tipus ja que els infereix de la funció reducing
         //context.actorOf(Props(new Reducer[K2,V2,V3](reducing)), "reducer"+i)
 
         // Ara enviem a cada reducer una clau de tipus V2 i una llista de valors de tipus K2. Les anotacions de tipus
         // no caldrien perquè ja sabem de quin tipus és dict, però ens ajuden a documentar.
-        for (((key:K2, lvalue:List[V2]),i) <-  dict.zipWithIndex) { //TODO: es penja pq dict és buit.
-          reducers(i%nreducers) ! toReducer(key, lvalue)
+
+          for (((key: K2, lvalue: List[V2]), i) <- dict.zipWithIndex) { //TODO: es penja pq dict és buit.
+            reducers(i % nreducers) ! toReducer(key, lvalue)
+          }
+        }
+        else{ //dict.size == 0, fromRreducersPenders = 0,
+          client ! Map.empty[K2, V3]
+          context.stop(self)
         }
       }
 

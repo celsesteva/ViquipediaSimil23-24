@@ -10,14 +10,14 @@ object Viqui {
     }
   }
 
-  def ngrames(input: List[String], n: Int): Map[List[String], Int] = {
+  def ngrames(input: List[String], n: Int): Map[List[String], Int] = { //it removes numbers
     val slidingWindows = input.sliding(n).toList
     val wordCounts: Map[List[String], Int] = Viqui.myFold(slidingWindows)
     wordCounts
   }
 
   def normalize(input: String): List[String] = {
-    input.map(c => if(c.isLetter || c.isWhitespace) c.toLower else ' ').split("\\s+").filter(_.nonEmpty).toList;
+    input.map(c => if(c.isLetter || c.isWhitespace) c.toLower else if (c.isDigit) c else ' ').split("\\s+").filter(_.nonEmpty).toList;
   }
 }
 /*
