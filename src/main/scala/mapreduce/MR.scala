@@ -15,7 +15,7 @@ import scala.concurrent.duration.DurationInt
 
 object MRWrapper{
   def execute[K1,V1,K2,V2,V3](
-                               input:List[(K1,List[V1])],
+                               input:List[(K1,List[V1])], //Todo: TO MAP
                                mapping:(K1,List[V1]) => List[(K2,V2)],
                                reducing:(K2,List[V2])=> (K2,V3),
                                mappers: Int = 1,
@@ -162,7 +162,7 @@ class MR[K1,V1,K2,V2,V3](
         // pel constructor del Reducer amb paràmetres
         nreducers = Math.max(Math.min(dict.size,maxReducers),1);
         fromReducersPendents = dict.size // actualitzem els reducers pendents
-        //TODO: quan hi ha 0 (dict.size == 0) es queda penjat. Això quan (A,List())
+        //TODO: quan hi ha 0 (dict.size == 0) es queda penjat. Això quan (A,List()), es penja amb test_viqui
         val reducers = for (i <- 0 until nreducers) yield
           context.actorOf(Props(new Reducer(reducing)), "reducer"+i)
         // No cal anotar els tipus ja que els infereix de la funció reducing
@@ -170,7 +170,7 @@ class MR[K1,V1,K2,V2,V3](
 
         // Ara enviem a cada reducer una clau de tipus V2 i una llista de valors de tipus K2. Les anotacions de tipus
         // no caldrien perquè ja sabem de quin tipus és dict, però ens ajuden a documentar.
-        for (((key:K2, lvalue:List[V2]),i) <-  dict.zipWithIndex) {
+        for (((key:K2, lvalue:List[V2]),i) <-  dict.zipWithIndex) { //TODO: es penja pq dict és buit.
           reducers(i%nreducers) ! toReducer(key, lvalue)
         }
       }

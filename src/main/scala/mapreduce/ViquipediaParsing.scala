@@ -68,7 +68,8 @@ object ViquipediaParse {
 
     //elimino [[, | i ]]
     //TODO: PETA, SPLIT ESTA BUIT, FAIG MALAMENT, EM PETO COSES QUE POTSER NO TOQUEN, ETC....
-    val cleanedRefs = filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).filterNot(_.equals(titol)).distinct; //removes repetits
+    val cleanedRefs = filteredRefs//filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).filterNot(_.equals(titol)).distinct; //removes repetits
+    //PETA EN EL EXEMPLE exampleFilename.
     //FILTERNOT: he de treure el titol?
 
     // caldrà eliminar-ne més?
