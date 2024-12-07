@@ -53,11 +53,12 @@ object pra2 extends App {
   val d: Double = 0.85;
   val prSteps = 10;
   val epsilon = 1E-5;
-  var nMappers = 100; //make option to change.
-  var nReducers = 100;
+  var nMappers = 1000; //make option to change.
+  var nReducers = 1000;
+  val numerOfFilesSimilitud = 100;
   //TODO: es penja amb "test_viqui/" pq? List(); dict.size és 0.
-  //val viquiFilesPath = "viqui_files/"; //TODO: FER QUE PUGUIS CANVIAR AIXÒ I ELS STOPwORDS.
-  val viquiFilesPath = "test_viqui3/";
+  val viquiFilesPath = "viqui_files/"; //TODO: FER QUE PUGUIS CANVIAR AIXÒ I ELS STOPwORDS.
+  //val viquiFilesPath = "test_viqui3/";
   println((System.nanoTime()-startTime)/1000000)
 
   def getListOfFiles(path: String): (List[(Double,List[String])],Int) = {
@@ -195,7 +196,7 @@ object pra2 extends App {
 
   def nonMutualReference(filesPath: String, query: String) = {
     //val (filesContents,nFiles) = getListOfFiles2(viquiFilesPath);
-    val pageRank = calcPageRankBasedOnQuery(query);
+    val pageRank = calcPageRankBasedOnQuery(query).take(numerOfFilesSimilitud);
     val titleRefs = pageRank.map(pr => (pr._1._1,pr._1._2))
 
     /*
@@ -246,87 +247,118 @@ object pra2 extends App {
     val newNonMutuallyReferenced = nonMutuallyReferenced - keyToRemove
     newNonMutuallyReferenced
   }
-/*
-  def cosinesim(input: String, other: String, stopWords: List[String], n: Int): Float = {
 
-    val stopWordsSet: Set[String] = stopWords.toSet
-    var inputFreq: Array[(String,Int)] = null; //això ho faig per a aque faci servir nonstopfreq quan n sigui 1.
-    var otherFreq: Array[(String,Int)] = null;
-    if(n==1){
-      inputFreq = nonstopfreq(input, stopWords).toArray;
-      otherFreq = nonstopfreq(other,stopWords).toArray;
-    }
-    else{
-      inputFreq = ngramesNonstopwords(input, n, stopWordsSet).toArray;
-      otherFreq = ngramesNonstopwords(other, n, stopWordsSet).toArray;
+  def cosinesim(contingutNormalitzat: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], wordInvValue:  Map[String, Double], stopWordsSet: Set[String]): Map[(String, String), Double] = {
+
+
+    def mapper(title: String, titlesNoReferenciatMutuament: List[String]): List[((String, Map[String,Int]), (String, Map[String,Int]))] = {
+      //puc agafar directament pq titles és un subconjunt de contingutNormalitzat.
+      titlesNoReferenciatMutuament.map(ts => ((ts,contingutNormalitzat.get(ts).head.head._1),(title,contingutNormalitzat.get(title).head.head._1)))
     }
 
-    //els passo a map per a poder fer les operacoins més rapides.
-    //alhora trobo el maxim de la frequencia i construeixo el mapa.
-    val (inputMap, maxInputFreq) = inputFreq.foldLeft((Map[String, Int](), 0)) { case ((map, maxFreq), (word, count)) =>
-      (map.updated(word, count), math.max(maxFreq, count))
-      //acutalitzo el valor del word amb el count que té. I busco pel maxim si el nou count és més gran.
+    //contingut és un List[String] pq ja esta normalitzat sense stopWords.
+    def reducer(titleCont: (String,Map[String,Int]),titleContNoReferenciatMutuament: List[(String,Map[String,Int])]): ((String, Map[String, Int]),List[(String, Map[String, Int])]) = {
+      (titleCont,titleContNoReferenciatMutuament)
     }
 
-    //faig el mateix per a l'altre.
-    val (otherMap, maxOtherFreq) = otherFreq.foldLeft((Map[String, Int](), 0)) { case ((map, maxFreq), (word, count)) =>
-      (map.updated(word, count), math.max(maxFreq, count))
+    val parellesTitolContingutLlistaContingutsNoReferenciat = MRWrapper.execute(newNonMutuallyReferenced.toList,mapper,reducer,nMappers,nReducers);
+
+
+    def mapperCosinesim(titleCont: (String,Map[String,Int]), titleContNoReferenciatMutuament: List[(String,Map[String,Int])]):  List[((String, String), Double)] = {
+      val tf_idfTitleCont = titleCont._2.map { case (word, count) =>
+        (word, count * wordInvValue.getOrElse(word, 1.0))
+      }
+      val maxTitle = tf_idfTitleCont.maxBy(_._2);
+
+      titleContNoReferenciatMutuament.map { case (otherTitle, otherWordCounts) =>
+        // Calculate tf-idf for the second title (non-mutually referenced)
+        val tf_idfOtherTitle = otherWordCounts.map { case (word, count) =>
+          (word, count * wordInvValue.getOrElse(word, 1.0))
+        }
+
+        val maxOtherTitle = tf_idfOtherTitle.maxBy(_._2);
+
+        val allWords = (tf_idfTitleCont.keys ++ tf_idfOtherTitle.keys).toSet;
+
+        //faig que totes les paraules estiguin alineades per a poder fer a[i] · b[i] //posant 0 a on no hi ha valors.
+        val aligned:Array[(String,Double,Double)] = allWords.toArray.map { word =>
+          val inputTfIdf = tf_idfTitleCont.getOrElse(word,0.0);
+          val otherTfIdf = tf_idfOtherTitle.getOrElse(word,0.0);
+          (word,inputTfIdf,otherTfIdf)
+        }
+
+        //transformo els pesos a valors relatius.
+        val weightedAlignment = aligned.map { case (word,inputTfIdf,otherTfIdf) =>
+          val normalizedInput = inputTfIdf / maxTitle._2
+          val normalizedOther = otherTfIdf / maxOtherTitle._2
+          (word,normalizedInput,normalizedOther)
+        }
+
+        val resultatNomerador = weightedAlignment.foldLeft(0.0) {(acc,input) => acc + (input._2*input._3)}
+        val resultatDenominadorA = Math.sqrt(weightedAlignment.foldLeft(0.0) {(acc,input) => acc + input._2*input._2})
+        val resultatDenominadorB = Math.sqrt(weightedAlignment.foldLeft(0.0) {(acc,input) => acc + input._3*input._3})
+
+        val resultat = if (resultatDenominadorA != 0.0 && resultatDenominadorB != 0.0) {
+          resultatNomerador / (resultatDenominadorA * resultatDenominadorB)
+        } else {
+          0.0
+        }
+        ((otherTitle,titleCont._1),resultat)
+      }
     }
 
-    //trobo totes les paraules uniques.
-    val allWords = (inputMap.keys ++ otherMap.keys).toSet;
-
-    //faig que totes les paraules estiguin alineades per a poder fer a[i] · b[i] //posant 0 a on no hi ha valors.
-    val aligned:Array[(String,Int,Int)] = allWords.toArray.map { word =>
-      val inputCount = inputMap.getOrElse(word,0);
-      val otherCount = otherMap.getOrElse(word,0);
-      (word,inputCount,otherCount)
+    def reducerCosinesim(titlePair: (String, String), cosine: List[Double]): ((String, String), Double) = {
+      (titlePair,cosine.sum)
     }
-
-    //transformo els pesos a valors relatius.
-    val weightedAlignment = aligned.map { case (word,inputCount,otherCount) =>
-      val normalizedInput = inputCount.toFloat / maxInputFreq
-      val normalizedOther = otherCount.toFloat / maxOtherFreq
-      (word,normalizedInput,normalizedOther)
-    }
-
-    //calculating the formula
-    val resultatNomerador = weightedAlignment.foldLeft(0.toFloat) {(acc,input) => acc + (input._2*input._3)}
-    val resultatDenominadorA = Math.sqrt(weightedAlignment.foldLeft(0.toFloat) {(acc,input) => acc + input._2*input._2})
-    val resultatDenominadorB = Math.sqrt(weightedAlignment.foldLeft(0.toFloat) {(acc,input) => acc + input._3*input._3})
-    val resultat = resultatNomerador/(resultatDenominadorA*resultatDenominadorB);
-    resultat.toFloat
+    MRWrapper.execute(parellesTitolContingutLlistaContingutsNoReferenciat.toList,mapperCosinesim,reducerCosinesim,nMappers,nReducers);
   }
-*/
-  def inverseDocFreq(contingut: Map[String,List[(String,List[String])]], newNonMutuallyReferenced: Map[String, List[String]]): Unit = {
 
+  def inverseDocFreq(contingut: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], stopWordsSet: Set[String]): Map[String,Double] = {
+    val C: Double = newNonMutuallyReferenced.size;
 
-    //cridar el cosinesim per a tots.
+    def mapper(title: String, nothing: List[String]): List[(String,Int)] = {
+      //obtinc el head pq només hi ha una llsita per title.
+      val content = contingut.get(title).map(f => f.head._1).head.keys.toList
+
+      content.toSet.map((word: String) => (word, 1)).toList
+    }
+    def reducer(word: String,counter: List[Int]): (String, Double) = {
+      (word,Math.log10(C/counter.sum.toDouble))
+    }
+
+    MRWrapper.execute(newNonMutuallyReferenced.toList,mapper,reducer,nMappers,nReducers);
   }
 
   def calcSimilitudDeNoReferenciadesMutuament(query: String): Unit = {
+    val filename ="stopwordscatalanet.txt"; //todo: CHANGE THIS LOL TO A general one.
+    val stopWords = ProcessListStrings.llegirFitxer(filename);
+    val stopWordsSet = Viqui.normalize(stopWords).toSet
+
     val start = System.nanoTime()
     val (fileCont,nFiles) = getListOfFiles2(viquiFilesPath);
-    def mapperReadTitlesRefs(filePath: String, nothing: List[Nothing]): List[(String,(String,List[String]))] = {
+    def mapperReadTitlesRefs(filePath: String, nothing: List[Nothing]): List[(String,(Map[String,Int],List[String]))] = {
       List(ViquipediaParse.parseViquipediaFile(filePath) match {
-        case ResultViquipediaParsing(title, cont, refs) => (title,(cont,refs))
+        case ResultViquipediaParsing(title, cont, refs) => (title,(Viqui.myFoldWords(Viqui.normalize(cont).filterNot(str => stopWordsSet.contains(str))),refs))
       })
     }
 
-    def reducerReadTitlesRefs(title: String, contRefs: List[(String,List[String])]): (String,List[(String,List[String])])= {
-      //titol unic -> un unic head
-      (title,List(contRefs.head))
+    def reducerReadTitlesRefs(title: String, contRefs: List[(Map[String,Int],List[String])]): (String,List[(Map[String,Int],List[String])])= {
+      (title,contRefs)
     }
-    val contingut: Map[String,List[(String,List[String])]] = MRWrapper.execute(fileCont, mapperReadTitlesRefs, reducerReadTitlesRefs,nMappers,nReducers)
+    val contingut: Map[String,List[(Map[String,Int],List[String])]] = MRWrapper.execute(fileCont, mapperReadTitlesRefs, reducerReadTitlesRefs,nMappers,nReducers)
 
 
     val nonMutualReferencedFilesContentsMap = nonMutualReference(viquiFilesPath,query);
+    //println("non mutually referenced: ")
+    //nonMutualReferencedFilesContentsMap.foreach { case (key, value) =>
+    //  print(key + " ====> ")  // Print key and arrow
+    //  println(value)           // Print value with newline
+    //}
 
-    inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap);
-
-
-    //MRWrapper.execute();
-
+    val wordInvValue = inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap,stopWordsSet);
+    //println(wordInvValue);
+    val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue,stopWordsSet).toList.sortWith(_._2 > _._2).take(10);
+    result.foreach(r => println(r._1 + " " + r._2))
     println("tf_idf " + (System.nanoTime()-start)/1000000 + "ms");
   }
 
@@ -434,7 +466,8 @@ object pra2 extends App {
 
       choice match {
         case "1" =>
-          calcSimilitudDeNoReferenciadesMutuament("text");
+          val query = askQuery()
+          calcSimilitudDeNoReferenciadesMutuament(query);
           mainMenu()
         case "2" => mainMenu()
         case _ =>
