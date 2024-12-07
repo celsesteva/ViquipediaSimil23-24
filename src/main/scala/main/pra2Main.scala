@@ -199,33 +199,6 @@ object pra2 extends App {
     val pageRank = calcPageRankBasedOnQuery(query).take(numerOfFilesSimilitud);
     val titleRefs = pageRank.map(pr => (pr._1._1,pr._1._2))
 
-    /*
-    def mapperReadRefsTitles(filePath: String, nothing: List[Nothing]): List[(String,String)] = {
-      ViquipediaParse.parseViquipediaFile(filePath) match {
-        case ResultViquipediaParsing(title, _, refs) => refs.map(ref => (ref,title));
-      }
-    }
-
-    def reducerReadRefsTitles(mainReference: String, titlesReferenced: List[String]): (String,List[String])= {
-      //titol unic -> un unic head
-      (mainReference,titlesReferenced)
-    }
-    val refsTitles: Map[String,List[String]] = MRWrapper.execute(filesContents, mapperReadRefsTitles, reducerReadRefsTitles,nMappers,nReducers)
-*/
-
-    //def mapperReadTitlesRefs(filePath: String, nothing: List[Nothing]): List[(String,(String,List[String]))] = {
-    //  List(ViquipediaParse.parseViquipediaFile(filePath) match {
-    //    case ResultViquipediaParsing(title, cont, refs) => (title,(cont,refs))
-    //  })
-    //}
-//
-    //def reducerReadTitlesRefs(title: String, contRefs: List[(String,List[String])]): (String,List[(String,List[String])])= {
-    //  //titol unic -> un unic head
-    //  (title,List(contRefs.head))
-    //}
-    //val titleRefs: Map[String,List[(String,List[String])]] = MRWrapper.execute(filesContents, mapperReadTitlesRefs, reducerReadTitlesRefs,nMappers,nReducers)
-
-
     def mapperSelectNonReferenced(title: String, refsCont: List[String]) = {
       //puc agafar directament head pq per cada titol només hi ha una llista de referencies.
       titleRefs.map(tr =>
@@ -242,10 +215,30 @@ object pra2 extends App {
       (title1,titlesNonMutuallyReferenced)
     }
 
+    // Function to remove duplicate mutually referenced entries
+    def removeMutualReferencesDuplicates(nonMutualMap: Map[String, List[String]]): Map[String, List[String]] = {
+      var result = nonMutualMap
+      val seen = scala.collection.mutable.Set[(String, String)]() // To track visited pairs
+
+      for ((title1, refs) <- nonMutualMap) {
+        for (title2 <- refs) {
+          //comprovar si ja hem mirat (title2,title1) per a evitar doble removal
+          if (nonMutualMap.get(title2).exists(_.contains(title1)) && !seen.contains((title2, title1))) {
+            seen.add((title1, title2))
+
+            result = result.updated(title1, result(title1).filterNot(_ == title2))
+          }
+        }
+      }
+
+      result
+    }
+
     val nonMutuallyReferenced = MRWrapper.execute(titleRefs.toList,mapperSelectNonReferenced,reducerSelectNonReferenced,nMappers,nReducers);
     val keyToRemove = ("") // Adjust according to the actual key type
     val newNonMutuallyReferenced = nonMutuallyReferenced - keyToRemove
-    newNonMutuallyReferenced
+    val newerNonMutuallyReferenced = removeMutualReferencesDuplicates(newNonMutuallyReferenced)
+    newerNonMutuallyReferenced ///newNonMutuallyReferenced
   }
 
   def cosinesim(contingutNormalitzat: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], wordInvValue:  Map[String, Double], stopWordsSet: Set[String]): Map[(String, String), Double] = {
@@ -349,14 +342,8 @@ object pra2 extends App {
 
 
     val nonMutualReferencedFilesContentsMap = nonMutualReference(viquiFilesPath,query);
-    //println("non mutually referenced: ")
-    //nonMutualReferencedFilesContentsMap.foreach { case (key, value) =>
-    //  print(key + " ====> ")  // Print key and arrow
-    //  println(value)           // Print value with newline
-    //}
 
     val wordInvValue = inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap,stopWordsSet);
-    //println(wordInvValue);
     val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue,stopWordsSet).toList.sortWith(_._2 > _._2).take(10);
     result.foreach(r => println(r._1 + " " + r._2))
     println("tf_idf " + (System.nanoTime()-start)/1000000 + "ms");
