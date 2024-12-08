@@ -94,7 +94,7 @@ object pra2 extends App {
   }
 
   def averageLinks(): Unit = {
-    val (viquiFiles,nFiles) = getListOfFiles(viquiFilesPath); //TODO: el (0.2 List(String)) a (string, List())
+    val (viquiFiles,nFiles) = getListOfFiles(viquiFilesPath);
     def mappingReadFiles(initialValue:Double, files:List[String]): List[(Int,Int)]  = {
       files.map(f => ViquipediaParse.parseViquipediaFile(f) match {
         case ResultViquipediaParsing(_,_,refs) => /*println(refs);*/(1,refs.length)
@@ -120,9 +120,9 @@ object pra2 extends App {
     val myQuery =  if (myQueryFiltered.isEmpty) Viqui.normalize(query) else myQueryFiltered
     val myQuerySize = Math.min(myQuery.size,1);
 
-    def readFilesPageRank(path: String): (Map[(String,List[String]),List[Double]],Int) = { //TODO: Map[(String,List[String]) -> Map[(String,Array[String])
+    def readFilesPageRank(path: String): (Map[(String,List[String]),List[Double]],Int) = {
       val (filesPath, nFiles) = getListOfFiles2(path);
-      def mapperReadFiles(file: String, nothing: List[Nothing]): List[((String,List[String]),List[Nothing])] = { //List[Nothing] a List[nFiles]
+      def mapperReadFiles(file: String, nothing: List[Nothing]): List[((String,List[String]),List[Nothing])] = {
         List(
           ViquipediaParse.parseViquipediaFile(file) match {
             case ResultViquipediaParsing(titol, cont, refs) =>
@@ -142,7 +142,7 @@ object pra2 extends App {
             case _ => throw new Exception("Error en el readFiles.")
           })
       }
-      def reducerReadFiles(titol: (String,List[String]), nothing: List[List[Nothing]]): ((String,List[String]),List[Double]) = { //només hi ha un double per (titol,refs)
+      def reducerReadFiles(titol: (String,List[String]), nothing: List[List[Nothing]]): ((String,List[String]),List[Double]) = {
         (titol,List(1.0/nFiles))
       }
       (MRWrapper.execute(filesPath, mapperReadFiles, reducerReadFiles,nMappers,nReducers),nFiles)
@@ -203,9 +203,7 @@ object pra2 extends App {
     newerNonMutuallyReferenced ///newNonMutuallyReferenced
   }
 
-  def cosinesim(contingutNormalitzat: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], wordInvValue:  Map[String, Double], stopWordsSet: Set[String]): Map[(String, String), Double] = {
-
-
+  def cosinesim(contingutNormalitzat: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], wordInvValue:  Map[String, Double]): Map[(String, String), Double] = {
     def mapper(title: String, titlesNoReferenciatMutuament: List[String]): List[((String, Map[String,Int]), (String, Map[String,Int]))] = {
       //puc agafar directament pq titles és un subconjunt de contingutNormalitzat.
       titlesNoReferenciatMutuament.map(ts => ((ts,contingutNormalitzat.get(ts).head.head._1),(title,contingutNormalitzat.get(title).head.head._1)))
@@ -215,24 +213,19 @@ object pra2 extends App {
     def reducer(titleCont: (String,Map[String,Int]),titleContNoReferenciatMutuament: List[(String,Map[String,Int])]): ((String, Map[String, Int]),List[(String, Map[String, Int])]) = {
       (titleCont,titleContNoReferenciatMutuament)
     }
-
     val parellesTitolContingutLlistaContingutsNoReferenciat = MRWrapper.execute(newNonMutuallyReferenced.toList,mapper,reducer,nMappers,nReducers);
-
 
     def mapperCosinesim(titleCont: (String,Map[String,Int]), titleContNoReferenciatMutuament: List[(String,Map[String,Int])]):  List[((String, String), Double)] = {
       val tf_idfTitleCont = titleCont._2.map { case (word, count) =>
         (word, count * wordInvValue.getOrElse(word, 1.0))
       }
       val maxTitle = tf_idfTitleCont.maxBy(_._2);
-
       titleContNoReferenciatMutuament.map { case (otherTitle, otherWordCounts) =>
         // Calculate tf_idf for the second title (non-mutually referenced)
         val tf_idfOtherTitle = otherWordCounts.map { case (word, count) =>
           (word, count * wordInvValue.getOrElse(word, 1.0))
         }
-
         val maxOtherTitle = tf_idfOtherTitle.maxBy(_._2);
-
         val allWords = (tf_idfTitleCont.keys ++ tf_idfOtherTitle.keys).toSet;
 
         //faig que totes les paraules estiguin alineades per a poder fer a[i] · b[i] //posant 0 a on no hi ha valors.
@@ -252,7 +245,6 @@ object pra2 extends App {
         val resultatNomerador = weightedAlignment.foldLeft(0.0) {(acc,input) => acc + (input._2*input._3)}
         val resultatDenominadorA = Math.sqrt(weightedAlignment.foldLeft(0.0) {(acc,input) => acc + input._2*input._2})
         val resultatDenominadorB = Math.sqrt(weightedAlignment.foldLeft(0.0) {(acc,input) => acc + input._3*input._3})
-
         val resultat = if (resultatDenominadorA != 0.0 && resultatDenominadorB != 0.0) {
           resultatNomerador / (resultatDenominadorA * resultatDenominadorB)
         } else {
@@ -268,7 +260,8 @@ object pra2 extends App {
     MRWrapper.execute(parellesTitolContingutLlistaContingutsNoReferenciat.toList,mapperCosinesim,reducerCosinesim,nMappers,nReducers);
   }
 
-  def inverseDocFreq(contingut: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], stopWordsSet: Set[String]): Map[String,Double] = {
+  def inverseDocFreq(contingut: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]]): Map[String,Double] = {
+    //ja trec les stop words quan llegeixo el fitxer, no cal fer-ho ara.
     //ja trec les stop words quan llegeixo el fitxer, no cal fer-ho ara.
     val C: Double = newNonMutuallyReferenced.size;
 
@@ -305,8 +298,8 @@ object pra2 extends App {
 
     val nonMutualReferencedFilesContentsMap = nonMutualReference(viquiFilesPath,query);
 
-    val wordInvValue = inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap,stopWordsSet);
-    val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue,stopWordsSet).toList.sortWith(_._2 > _._2).take(trakeNumberToPrint);
+    val wordInvValue = inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap);
+    val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue).toList.sortWith(_._2 > _._2).take(trakeNumberToPrint);
     println(s"Top $trakeNumberToPrint: ")
     result.foreach { case (page, similarityScore) =>
       printf("%-80s %20.10f\n", page, similarityScore)
