@@ -15,6 +15,9 @@ object pra2 extends App {
   val numerOfFilesSimilitud = 100;
   val trakeNumberToPrint = 10;
   val viquiFilesPath = "viqui_files/";
+
+  Menu.mainMenu()
+
   def getListOfFiles(path: String): (List[(Double,List[String])],Int) = {
     val files = new File(path);
     val filesList = files.listFiles.filter(f => f.isFile && f.getName.endsWith(".xml")).map(f => f.getPath.mkString)
@@ -52,9 +55,7 @@ object pra2 extends App {
     var newRefMap = contingutOriginal;
     while (steps < prSteps && error > epsilon) {
       val valorsRefs = MRWrapper.execute(newRefMap.toList, mapperEnviarRef, reducerRebreFromRef,nMappers,nReducers);
-      //println("valRefs: " + valorsRefs) //els que no reben valors de cap, no estan aquí. però també hi ha links a pagines externes.
 
-      // Calculate the new PageRank with damping factor //TODO: FER MapReduce.
       val updatedRefMap = contingutOriginal.map {
         case ((key1, listKey), _) =>
           val incomingPR = valorsRefs.getOrElse(key1, 0.0)
@@ -67,14 +68,11 @@ object pra2 extends App {
         case (((_, _), oldPR), ((_, _), newPR)) =>
           math.abs(oldPR.head - newPR.head)
       }.sum
-      newRefMap = updatedRefMap // Update for the next iteration
-      //println("newRefMap: " + newRefMap)
+      newRefMap = updatedRefMap
       steps += 1;
     }
     newRefMap
   }
-
-  Menu.mainMenu()
 
   def timeMeasurement[A](function: => A): (Double,A) = {
     val before = System.nanoTime
@@ -275,7 +273,6 @@ object pra2 extends App {
   }
 
   def calcSimilitudDeNoReferenciadesMutuament(query: String): Unit = {
-    val start = System.nanoTime()
     val filename ="stopwordscatalanet.txt"; //todo: CHANGE THIS LOL TO A general one.
     val stopWords = ProcessListStrings.llegirFitxer(filename);
     val stopWordsSet = Viqui.normalize(stopWords).toSet
@@ -297,10 +294,11 @@ object pra2 extends App {
 
     val wordInvValue = inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap,stopWordsSet);
     val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue,stopWordsSet).toList.sortWith(_._2 > _._2).take(trakeNumberToPrint);
-    result.foreach(r => println(r._1 + " " + r._2))
-    println("tf_idf " + (System.nanoTime()-start)/1000000 + "ms");
+    println(s"Top $trakeNumberToPrint: ")
+    result.foreach { case (page, similarityScore) =>
+      printf("%-80s %20.10f\n", page, similarityScore)
+    }
   }
-
 
   object Menu {
 
@@ -311,8 +309,8 @@ object pra2 extends App {
       println("2. Recommendation based on query.")
       println("3. Detect similar pages that don't reference each other.")
       println("4. Time measurement.")
-      println("5. Change file folder.")
-      println("5. Exit.")
+      println("5. Change number of mappers and reducers.")
+      println("6. Exit.")
 
       val choice = readLine("Please select an option (1-5): ").trim
 
@@ -320,8 +318,9 @@ object pra2 extends App {
         case "1" => optionAverageRefs()
         case "2" => optionRecomendation()
         case "3" => similarNonMutualReferenced()
-        case "4" => option4()
-        case "5" => println("Exiting... Goodbye!")
+        case "4" => measureTime()
+        case "5" => changeNumberOfMappersReducers()
+        case "6" => println("Exiting... Goodbye!")
         case _ =>
           println("Invalid choice, please try again.")
           mainMenu()
@@ -354,13 +353,16 @@ object pra2 extends App {
         println(s"1. Calculate PR based on your query '$query'.")
         println("2. Change query.")
         println("3. Go back.")
+
         def askQueryChoice() {
           val choice = readLine("Please select an option (1-3): ").trim
           choice match {
             case "1" =>
               val pageRank = calcPageRankBasedOnQuery(query).take(trakeNumberToPrint);
-              println("Top 10: ")
-              pageRank.foreach( f => printf("%s %.10f\n", f._1._1, f._2.sum))
+              println(s"Top $trakeNumberToPrint: ")
+              pageRank.foreach { case (page, rank) =>
+                printf("%-80s %20.10f\n", page._1, rank.sum)
+              }
               mainMenu();
             case "2" =>
               optionAskQuery()
@@ -375,6 +377,7 @@ object pra2 extends App {
               askQueryChoice()
           }
         }
+
         askQueryChoice()
       }
 
@@ -414,22 +417,144 @@ object pra2 extends App {
       }
     }
 
-    def option4(): Unit = {
+    def measureTime(): Unit = {
       println()
       println("Option 4: Time measurement.")
-      println("1. Do something with Option 4")
+      println("1. Measure time of Calculate the average number of references that all pages have.")
+      println("2. Measure time of Recommendation based on query.")
+      println("3. Measure time of Detect similar pages that don't reference each other.")
+      println("4. Go Back to Main Menu")
+
+      val choice = readLine("Please select an option (1-4): ").trim
+
+      choice match {
+        case "1" => averageLinksTimed()
+        case "2" => recommendationBasedOnQueryTimed()
+        case "3" => similarNonMutualReferencedTimed()
+        case "4" => mainMenu()
+        case _ =>
+          println("Invalid choice, please try again.")
+          measureTime()
+      }
+    }
+
+    def averageLinksTimed(): Unit = {
+      println()
+      println("1. Measure time of Calculate the average number of references.")
+      println("2. Go back.")
+
+      val choice = readLine("Please select an option (1-2): ").trim
+
+      choice match {
+        case "1" =>
+          val (time, result) = timeMeasurement(averageLinks())
+          println(f"It took ${time / 1000.0}%.4f seconds.")
+          mainMenu()
+
+        case "2" => measureTime()
+
+        case _ =>
+          println("Invalid choice, please try again.")
+          averageLinksTimed()
+      }
+    }
+
+    def recommendationBasedOnQueryTimed(): Unit = {
+      println()
+      println("1. Measure time of Recommendation based on query.")
+      println("2. Go back.")
+
+      val choice = readLine("Please select an option (1-2): ").trim
+
+      choice match {
+        case "1" =>
+          queryRecommendationFlow()
+
+        case "2" => measureTime()
+
+        case _ =>
+          println("Invalid choice, please try again.")
+          recommendationBasedOnQueryTimed()
+      }
+    }
+
+    def queryRecommendationFlow(): Unit = {
+      var query = askQuery()
+
+      def askQueryChoice(): Unit = {
+        println(s"1. Calculate PR based on your query '$query'.")
+        println("2. Change query.")
+        println("3. Go back.")
+
+        val choice = readLine("Please select an option (1-3): ").trim
+
+        choice match {
+          case "1" =>
+            val (time, pageRankAll) = timeMeasurement(calcPageRankBasedOnQuery(query))
+            val pageRank = pageRankAll.take(trakeNumberToPrint)
+            println(s"Top $trakeNumberToPrint:")
+            pageRank.foreach { case (page, rank) =>
+              printf("%-80s %20.10f\n", page._1, rank.sum)
+            }
+            println(f"It took ${time / 1000.0}%.4f seconds.")
+            mainMenu()
+
+          case "2" =>
+            query = askQuery()
+            askQueryChoice()
+
+          case "3" => recommendationBasedOnQueryTimed()
+
+          case _ =>
+            println("Invalid choice, please try again.")
+            askQueryChoice()
+        }
+      }
+
+      askQueryChoice()
+    }
+
+    def similarNonMutualReferencedTimed(): Unit = {
+      println()
+      println("1. Measure time of Detect similar pages that don't reference each other.")
+      println("2. Go back.")
+
+      val choice = readLine("Please select an option (1-2): ").trim
+
+      choice match {
+        case "1" =>
+          val query = askQuery()
+          val (time, _) = timeMeasurement(calcSimilitudDeNoReferenciadesMutuament(query))
+          println(f"It took ${time / 1000.0}%.4f seconds.")
+          mainMenu()
+
+        case "2" => measureTime()
+
+        case _ =>
+          println("Invalid choice, please try again.")
+          similarNonMutualReferencedTimed()
+      }
+    }
+
+    def changeNumberOfMappersReducers(): Unit = {
+      println()
+      println("Option 5: Change number of mappers and reducers.")
+      println("1. Enter the number of mappers and reducers.")
       println("2. Go Back to Main Menu")
 
       val choice = readLine("Please select an option (1-2): ").trim
 
       choice match {
         case "1" =>
-          println("Doing something with Option 3...")
-          option4()
+          val (n,m) = changeNmappersNreducers();
+          nMappers = n;
+          nReducers = m;
+          println(s"The new mappers and reducers ammount are ($nMappers,$nReducers)")
+          mainMenu()
         case "2" => mainMenu()
         case _ =>
           println("Invalid choice, please try again.")
-          option4()
+          changeNumberOfMappersReducers()
       }
     }
 
@@ -443,6 +568,30 @@ object pra2 extends App {
         }
       } while (query.isEmpty || query.equals(""))
       query
+    }
+
+    def changeNmappersNreducers(): (Int, Int) = {
+      var n: Option[Int] = None
+
+      def isValidPositiveInt(input: String): Option[Int] = {
+        try {
+          val num = input.toInt
+          if (num > 0) Some(num) else None
+        } catch {
+          case _: NumberFormatException => None
+        }
+      }
+      do {
+        print("Enter the number of mappers and reducers (_ >= 1): ")
+        val userInput = scala.io.StdIn.readLine().trim
+
+        n = isValidPositiveInt(userInput)
+
+        if (n.isEmpty) {
+          println("Invalid input. Please enter a positive integer.")
+        }
+      } while (n.isEmpty)
+      (n.get, n.get)
     }
   }
 }
