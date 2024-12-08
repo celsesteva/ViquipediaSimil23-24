@@ -203,7 +203,17 @@ object pra2 extends App {
     newerNonMutuallyReferenced ///newNonMutuallyReferenced
   }
 
+  //ContingutNormalitzat: Map[titol del fitxer, List de (contingut per paraula, ocurrencies), Lista de referencies]
   def cosinesim(contingutNormalitzat: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], wordInvValue:  Map[String, Double]): Map[(String, String), Double] = {
+
+    /*
+    Aqui, en el primer mapper És un map de String, list[Strings], per tant quan el passo en el mapReduce, el separa a
+    titol, List[String]. Doncs faig un bucle pel segon (recordar que ja he tret els duplicats), i agrupu a aquest amb
+    el seu contingut (Map de Strings, Ocurrences(int))  i els agrupu. també ho faig amb la seva parella,
+    com que ho he passat a dintre del map reduce, és el titol. Ara ja tinc la parella que s'ha de calcular el cosinesim
+    però amb el contingut agrupat, així no s'ha d'anar a buscar.
+    El reducer retorna les dades tal cual.
+     */
     def mapper(title: String, titlesNoReferenciatMutuament: List[String]): List[((String, Map[String,Int]), (String, Map[String,Int]))] = {
       //puc agafar directament pq titles és un subconjunt de contingutNormalitzat.
       titlesNoReferenciatMutuament.map(ts => ((ts,contingutNormalitzat.get(ts).head.head._1),(title,contingutNormalitzat.get(title).head.head._1)))
