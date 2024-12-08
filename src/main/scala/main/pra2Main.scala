@@ -12,7 +12,7 @@ object pra2 extends App {
   val epsilon = 1E-5;
   var nMappers = 1000; //make option to change.
   var nReducers = 1000;
-  val numerOfFilesSimilitud = 100;
+  val numerOfFilesSimilitud = 1000;
   val trakeNumberToPrint = 10;
   val viquiFilesPath = "viqui_files/";
 
@@ -55,13 +55,27 @@ object pra2 extends App {
     while (steps < prSteps && error > epsilon) {
       val valorsRefs = MRWrapper.execute(newRefMap.toList, mapperEnviarRef, reducerRebreFromRef,nMappers,nReducers);
 
-      val updatedRefMap = contingutOriginal.map {
-        case ((key1, listKey), _) =>
-          val incomingPR = valorsRefs.getOrElse(key1, 0.0)
-          val newPR = ((1 - d) / nFiles) + d * incomingPR
-          ((key1, listKey), List(newPR))
-        case _ => throw new Exception("Error en el PR, quan es passa de map a newRefMap.")
+      //val updatedRefMap = contingutOriginal.map {
+      //  case ((key1, listKey), _) =>
+      //    val incomingPR = valorsRefs.getOrElse(key1, 0.0)
+      //    val newPR = ((1 - d) / nFiles) + d * incomingPR
+      //    ((key1, listKey), List(newPR))
+      //  case _ => throw new Exception("Error en el PR, quan es passa de map a newRefMap.")
+      //}
+
+      def mapperNewPr(titol: (String,List[String]), pr: List[Double]) = {
+        List(titol match {
+          case (key1, listKey) =>
+            val incomingPR = valorsRefs.getOrElse(key1, 0.0)
+            val newPR = ((1 - d) / nFiles) + d * incomingPR
+            ((key1, listKey), newPR)
+        })
       }
+      def reducerNewPr(titol: (String, List[String]), pr: List[Double]) = {
+        (titol,List(pr.sum))
+      }
+
+      val updatedRefMap = MRWrapper.execute(contingutOriginal.toList,mapperNewPr,reducerNewPr,nMappers,nReducers);
 
       error = newRefMap.zip(updatedRefMap).map {
         case (((_, _), oldPR), ((_, _), newPR)) =>
