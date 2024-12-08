@@ -38,13 +38,12 @@ object pra2 extends App {
   def PR(contingutOriginal: Map[(String,List[String]),List[Double]],nFiles: Int):  Map[(String, List[String]), List[Double]] = {
     //IF contingutOriginal és buit, peta.
     //titol és unic, per tant pr també és unic. pr és un double unic, una llista amb un element.
-    def mapperEnviarRef(titolRefs: (String,List[String]), pr: List[Double]): List[(String,Double)] = { //TODO: titolRefs (String, List[String]) -> (String, Array[string] for O(1) length.
+    def mapperEnviarRef(titolRefs: (String,List[String]), pr: List[Double]): List[(String,Double)] = {
       val totalPr = pr.sum
       val nRefs = titolRefs._2.length
       val prPerRef = if (nRefs > 0) totalPr / nRefs else 0.0
       titolRefs._2.map(ref => (ref,prPerRef))
     }
-    //titol és únic, per tant es pot agafar el refsPR.head._1, ja que conte tots els prs que van a ell
     def reducerRebreFromRef(titol: String, pr: List[Double]): (String,Double) = {
       (titol, pr.sum)
     }

@@ -15,7 +15,7 @@ import scala.concurrent.duration.DurationInt
 
 object MRWrapper{
   def execute[K1,V1,K2,V2,V3](
-                               input:List[(K1,List[V1])], //Todo: TO MAP
+                               input:List[(K1,List[V1])],
                                mapping:(K1,List[V1]) => List[(K2,V2)],
                                reducing:(K2,List[V2])=> (K2,V3),
                                mappers: Int = 1,
