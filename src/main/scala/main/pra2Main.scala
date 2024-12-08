@@ -46,6 +46,11 @@ object tests extends App {
   //elimino [[, | i ]]
   //TODO: PETA, SPLIT ESTA BUIT, FAIG MALAMENT, EM PETO COSES QUE POTSER NO TOQUEN, ETC....
   val cleanedRefs = filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).distinct; //removes repetits
+
+  val listOfTuples = List(("a", 1), ("b", 2), ("c", 3))
+  val map = listOfTuples.toMap
+  println(map)
+  println(Set[String]("here"))
 }
 
 object pra2 extends App {
@@ -56,6 +61,7 @@ object pra2 extends App {
   var nMappers = 1000; //make option to change.
   var nReducers = 1000;
   val numerOfFilesSimilitud = 100;
+  val trakeNumberToPrint = 10;
   //TODO: es penja amb "test_viqui/" pq? List(); dict.size és 0.
   val viquiFilesPath = "viqui_files/"; //TODO: FER QUE PUGUIS CANVIAR AIXÒ I ELS STOPwORDS.
   //val viquiFilesPath = "test_viqui3/";
@@ -110,6 +116,24 @@ object pra2 extends App {
         case _ => throw new Exception("Error en el PR, quan es passa de map a newRefMap.")
       }
 
+      /*
+      def mapperNewPr(key: (String,List[String]), nothing: List[List[Double]]){
+      //només hi ha una llista de pr. per tant es pot agafar head.
+       key match {
+        case ((key1, listKey), _) =>
+          val incomingPR = valorsRefs.getOrElse(key1._1, 0.0)
+          val newPR = ((1 - d) / nFiles) + d * incomingPR
+          ((key1, listKey), List(newPR))
+          (key,newPr)
+        }
+      }
+
+      def reducerNewPr(key: String, newPr: List[Double]){
+        (String,List(newPr.sum))
+      }
+
+      val updatedRefMap = MRWrapper.execute(contingutOriginal.toList,mapperNewPr,reducerNewPr,nMappers,nReducers);
+       */
       error = newRefMap.zip(updatedRefMap).map {
         case (((_, _), oldPR), ((_, _), newPR)) =>
           math.abs(oldPR.head - newPR.head)
@@ -150,7 +174,7 @@ object pra2 extends App {
     }
   }
 
-  def calcPageRankBasedOnQuery(query: String): Map[(String, List[String]), List[Double]] = {
+  def calcPageRankBasedOnQuery(query: String): List[((String, List[String]), List[Double])] = {
     ////TODO: map reduce per a filtrar els fitxers que tenen la paraula search/paraules
     val filename ="stopwordscatalanet.txt"; //todo: CHANGE THIS LOL TO A general one.
     val stopWords = ProcessListStrings.llegirFitxer(filename);
@@ -168,13 +192,13 @@ object pra2 extends App {
             case ResultViquipediaParsing(titol, cont, refs) =>
               val nonStopCont = Viqui.normalize(cont).filterNot(str => stopWordsSet.contains(str));
               if(nonStopCont.nonEmpty){
-              val ngram = Viqui.ngrames(nonStopCont,myQuerySize);
-              if(ngram.contains(myQuery)){
-                ((titol,refs),List())
-              }
-              else{
-                (("",List[String]()),List())
-              }
+                val ngram = Viqui.ngrames(nonStopCont,myQuerySize);
+                if(ngram.contains(myQuery)){
+                  ((titol,refs),List())
+                }
+                else{
+                  (("",List[String]()),List())
+                }
               }
               else{
                 (("",List[String]()),List())
@@ -191,12 +215,12 @@ object pra2 extends App {
     val keyToRemove = ("", List[String]()) // Adjust according to the actual key type
     val newFileCont = fileCont - keyToRemove
     //println("newFileCont: " + newFileCont);
-    PR(newFileCont,nFiles)
+    PR(newFileCont,nFiles).toList.sortWith(_._2.sum > _._2.sum)
   }
 
   def nonMutualReference(filesPath: String, query: String) = {
     //val (filesContents,nFiles) = getListOfFiles2(viquiFilesPath);
-    val pageRank = calcPageRankBasedOnQuery(query).take(numerOfFilesSimilitud);
+    val pageRank = calcPageRankBasedOnQuery(query).take(numerOfFilesSimilitud).toMap;
     val titleRefs = pageRank.map(pr => (pr._1._1,pr._1._2))
 
     def mapperSelectNonReferenced(title: String, refsCont: List[String]) = {
@@ -212,11 +236,11 @@ object pra2 extends App {
     }
 
     def reducerSelectNonReferenced(title1: String, titlesNonMutuallyReferenced: List[String]) = {
-      (title1,titlesNonMutuallyReferenced)
+      (title1,titlesNonMutuallyReferenced.toSet)
     }
 
     // Function to remove duplicate mutually referenced entries
-    def removeMutualReferencesDuplicates(nonMutualMap: Map[String, List[String]]): Map[String, List[String]] = {
+    def removeMutualReferencesDuplicates(nonMutualMap: Map[String, Set[String]]): Map[String, List[String]] = {
       var result = nonMutualMap
       val seen = scala.collection.mutable.Set[(String, String)]() // To track visited pairs
 
@@ -231,7 +255,10 @@ object pra2 extends App {
         }
       }
 
-      result
+      val resultAsList: Map[String, List[String]] = result.map {
+        case (key, valueSet) => key -> valueSet.toList
+      }
+      resultAsList
     }
 
     val nonMutuallyReferenced = MRWrapper.execute(titleRefs.toList,mapperSelectNonReferenced,reducerSelectNonReferenced,nMappers,nReducers);
@@ -307,6 +334,7 @@ object pra2 extends App {
   }
 
   def inverseDocFreq(contingut: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]], stopWordsSet: Set[String]): Map[String,Double] = {
+    //ja trec les stop words quan llegeixo el fitxer, no cal fer-ho ara.
     val C: Double = newNonMutuallyReferenced.size;
 
     def mapper(title: String, nothing: List[String]): List[(String,Int)] = {
@@ -316,18 +344,18 @@ object pra2 extends App {
       content.toSet.map((word: String) => (word, 1)).toList
     }
     def reducer(word: String,counter: List[Int]): (String, Double) = {
-      (word,Math.log10(C/counter.sum.toDouble))
+      (word,Math.log(C/counter.sum.toDouble))
     }
 
     MRWrapper.execute(newNonMutuallyReferenced.toList,mapper,reducer,nMappers,nReducers);
   }
 
   def calcSimilitudDeNoReferenciadesMutuament(query: String): Unit = {
+    val start = System.nanoTime()
     val filename ="stopwordscatalanet.txt"; //todo: CHANGE THIS LOL TO A general one.
     val stopWords = ProcessListStrings.llegirFitxer(filename);
     val stopWordsSet = Viqui.normalize(stopWords).toSet
 
-    val start = System.nanoTime()
     val (fileCont,nFiles) = getListOfFiles2(viquiFilesPath);
     def mapperReadTitlesRefs(filePath: String, nothing: List[Nothing]): List[(String,(Map[String,Int],List[String]))] = {
       List(ViquipediaParse.parseViquipediaFile(filePath) match {
@@ -344,7 +372,7 @@ object pra2 extends App {
     val nonMutualReferencedFilesContentsMap = nonMutualReference(viquiFilesPath,query);
 
     val wordInvValue = inverseDocFreq(contingut,nonMutualReferencedFilesContentsMap,stopWordsSet);
-    val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue,stopWordsSet).toList.sortWith(_._2 > _._2).take(10);
+    val result = cosinesim(contingut,nonMutualReferencedFilesContentsMap,wordInvValue,stopWordsSet).toList.sortWith(_._2 > _._2).take(trakeNumberToPrint);
     result.foreach(r => println(r._1 + " " + r._2))
     println("tf_idf " + (System.nanoTime()-start)/1000000 + "ms");
   }
@@ -406,10 +434,9 @@ object pra2 extends App {
           val choice = readLine("Please select an option (1-3): ").trim
           choice match {
             case "1" =>
-              val pageRank = calcPageRankBasedOnQuery(query);
-              val orderedPG = pageRank.toList.sortWith(_._2.sum > _._2.sum).take(10);
+              val pageRank = calcPageRankBasedOnQuery(query).take(trakeNumberToPrint);
               println("Top 10: ")
-              orderedPG.foreach( f => printf("%s %.10f\n", f._1._1, f._2.sum))
+              pageRank.foreach( f => printf("%s %.10f\n", f._1._1, f._2.sum))
               mainMenu();
             case "2" =>
               optionAskQuery()
@@ -483,10 +510,15 @@ object pra2 extends App {
     }
 
     def askQuery(): String = {
-      print("Query: ")
-      val query = readLine().trim;
-      println("Your query is \'" + query + "\'.");
-      query;
+      var query: String = ""
+      do {
+        print("Query: ")
+        query = scala.io.StdIn.readLine().trim
+        if (query.nonEmpty) {
+          println("Your query is '" + query + "'.")
+        }
+      } while (query.isEmpty || query.equals(""))
+      query
     }
   }
 }
