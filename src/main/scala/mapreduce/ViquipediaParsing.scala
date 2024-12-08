@@ -67,7 +67,6 @@ object ViquipediaParse {
     val filteredRefs = refs.filterNot(ref => disallowedPattern.findFirstIn(ref).isDefined).filterNot(_.isEmpty)
 
     //elimino [[, | i ]]
-    //TODO: PETA, SPLIT ESTA BUIT, FAIG MALAMENT, EM PETO COSES QUE POTSER NO TOQUEN, ETC....
     val cleanedRefs = filteredRefs
       .map(ref => ref.split("\\[\\[|\\]\\]|\\|"))
       .collect { case parts if parts.length > 1 => parts(1) } // Only collect if there's a second part
