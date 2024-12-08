@@ -161,8 +161,6 @@ class MR[K1,V1,K2,V2,V3](
 
       fromMappersPendents -= 1
 
-      //TODO també peta quan selecciones 2 1 a 1
-      // Quan ja hem rebut tots els missatges dels mappers:
       if (fromMappersPendents==0)
       {
         for (mapper <- context.children) {
@@ -173,7 +171,7 @@ class MR[K1,V1,K2,V2,V3](
         nreducers = Math.max(Math.min(dict.size,maxReducers),1);
         fromReducersPendents = dict.size // actualitzem els reducers pendents
         if(dict.nonEmpty) {
-        //TODO: quan hi ha 0 (dict.size == 0) es queda penjat. Això quan (A,List()), es penja amb test_viqui
+
           val reducers = for (i <- 0 until nreducers) yield
             context.actorOf(Props(new Reducer(reducing)), "reducer" + i)
 
@@ -183,7 +181,7 @@ class MR[K1,V1,K2,V2,V3](
         // Ara enviem a cada reducer una clau de tipus V2 i una llista de valors de tipus K2. Les anotacions de tipus
         // no caldrien perquè ja sabem de quin tipus és dict, però ens ajuden a documentar.
 
-          for (((key: K2, lvalue: List[V2]), i) <- dict.zipWithIndex) { //TODO: es penja pq dict és buit.
+          for (((key: K2, lvalue: List[V2]), i) <- dict.zipWithIndex) {
             reducers(i % nreducers) ! toReducer(key, lvalue)
           }
         }
