@@ -20,7 +20,6 @@ object MRWrapper{
                                reducing:(K2,List[V2])=> (K2,V3),
                                mappers: Int = 1,
                                reducers: Int = 1, nomSystema:String ="sistema", nomMaster: String ="master"): Map[K2, V3] = {
-    //TODO: MIRAR SI EL IF HA DE SER AQUI.
     if(input.nonEmpty) {
       val systema: ActorSystem = ActorSystem(nomSystema)
       val actor = systema.actorOf(Props(new MR(input, mapping, reducing, mappers, reducers)), name = nomMaster)
