@@ -1,60 +1,12 @@
-import akka.actor.{ActorSystem, Props}
-import akka.util.Timeout
 import mr.ViquipediaParse._
-
 import scala.io.StdIn.readLine
 import java.io.File
 import udg.objects.Viqui
 import mr._
-
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
-import akka.actor.{ActorSystem, PoisonPill, Props}
-import akka.pattern.ask
-import akka.util.Timeout
 import mapreduce.ProcessListStrings
-
-import scala.collection.immutable.Range
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import scala.io.Source
 import scala.language.postfixOps
-import ProcessListStrings._
-
-import scala.util.matching.Regex
-
-//TODO: HIGHLIGHT: IMPORTANT PETA QUAN FAIG SERVIR VIQUI_FILES, EN LLOC DEL SUBSET, PETA EN EL VIQUI_PARSER CREC.
-
-//TODO: object.wrapper potser peta perquè ès object. (object.wrapper d'intre object.wrapper? peta?)
-//TODO: (0.2, List(Element)) as (String,List())????????
-//TODO: crec que el mapper no importa per a l'efficiencia si hi passes a 1 o 2, però el reducer sí.
-
-object tests extends App {
-  val ref = new Regex("\\[\\[[^\\]]*\\]\\]")
-  //println("La pagina es: " + titol)
-  //println("i el contingut: ")
-  //println(contingut)
-  val refs = List("[[]]")
-
-  val disallowedChars = Set(':', '#')
-  val disallowedPattern = "[:#]".r
-
-  // elimino les que tenen :
-  //val filteredRefs = refs.filterNot(ref => disallowedChars.exists(c => ref.contains(c)))
-  val filteredRefs = refs.filterNot(ref => disallowedPattern.findFirstIn(ref).isDefined).filter(_.isEmpty)
-
-  //elimino [[, | i ]]
-  //TODO: PETA, SPLIT ESTA BUIT, FAIG MALAMENT, EM PETO COSES QUE POTSER NO TOQUEN, ETC....
-  val cleanedRefs = filteredRefs.map(ref => ref.split("\\[\\[|\\]\\]|\\|")(1)).distinct; //removes repetits
-
-  val listOfTuples = List(("a", 1), ("b", 2), ("c", 3))
-  val map = listOfTuples.toMap
-  println(map)
-  println(Set[String]("here"))
-}
 
 object pra2 extends App {
-  val startTime = System.nanoTime();
   val d: Double = 0.85;
   val prSteps = 10;
   val epsilon = 1E-5;
@@ -62,11 +14,7 @@ object pra2 extends App {
   var nReducers = 1000;
   val numerOfFilesSimilitud = 100;
   val trakeNumberToPrint = 10;
-  //TODO: es penja amb "test_viqui/" pq? List(); dict.size és 0.
-  val viquiFilesPath = "viqui_files/"; //TODO: FER QUE PUGUIS CANVIAR AIXÒ I ELS STOPwORDS.
-  //val viquiFilesPath = "test_viqui3/";
-  println((System.nanoTime()-startTime)/1000000)
-
+  val viquiFilesPath = "viqui_files/";
   def getListOfFiles(path: String): (List[(Double,List[String])],Int) = {
     val files = new File(path);
     val filesList = files.listFiles.filter(f => f.isFile && f.getName.endsWith(".xml")).map(f => f.getPath.mkString)
@@ -99,7 +47,6 @@ object pra2 extends App {
     }
 
     //reducer reb i suma les pagines que l'apunten, mapper envia les dades.
-    //TODO: mapreduce???? (en el reduce del mapReduce fer que el reducing sigui mapIndex, i el
     var steps = 0;
     var error: Double = 1;
     var newRefMap = contingutOriginal;
@@ -116,24 +63,6 @@ object pra2 extends App {
         case _ => throw new Exception("Error en el PR, quan es passa de map a newRefMap.")
       }
 
-      /*
-      def mapperNewPr(key: (String,List[String]), nothing: List[List[Double]]){
-      //només hi ha una llista de pr. per tant es pot agafar head.
-       key match {
-        case ((key1, listKey), _) =>
-          val incomingPR = valorsRefs.getOrElse(key1._1, 0.0)
-          val newPR = ((1 - d) / nFiles) + d * incomingPR
-          ((key1, listKey), List(newPR))
-          (key,newPr)
-        }
-      }
-
-      def reducerNewPr(key: String, newPr: List[Double]){
-        (String,List(newPr.sum))
-      }
-
-      val updatedRefMap = MRWrapper.execute(contingutOriginal.toList,mapperNewPr,reducerNewPr,nMappers,nReducers);
-       */
       error = newRefMap.zip(updatedRefMap).map {
         case (((_, _), oldPR), ((_, _), newPR)) =>
           math.abs(oldPR.head - newPR.head)
@@ -145,8 +74,6 @@ object pra2 extends App {
     newRefMap
   }
 
-  println((System.nanoTime()-startTime)/1000000)
-
   Menu.mainMenu()
 
   def timeMeasurement[A](function: => A): (Double,A) = {
@@ -154,7 +81,6 @@ object pra2 extends App {
     val result = function
     ((System.nanoTime - before)/1000000.0, result)
   }
-
 
   def averageLinks(): Unit = {
     val (viquiFiles,nFiles) = getListOfFiles(viquiFilesPath); //TODO: el (0.2 List(String)) a (string, List())
@@ -175,8 +101,7 @@ object pra2 extends App {
   }
 
   def calcPageRankBasedOnQuery(query: String): List[((String, List[String]), List[Double])] = {
-    ////TODO: map reduce per a filtrar els fitxers que tenen la paraula search/paraules
-    val filename ="stopwordscatalanet.txt"; //todo: CHANGE THIS LOL TO A general one.
+    val filename ="stopwordscatalanet.txt";
     val stopWords = ProcessListStrings.llegirFitxer(filename);
     val stopWordsSet = Viqui.normalize(stopWords).toSet
 
@@ -214,7 +139,6 @@ object pra2 extends App {
     val (fileCont,nFiles) = readFilesPageRank(viquiFilesPath);
     val keyToRemove = ("", List[String]()) // Adjust according to the actual key type
     val newFileCont = fileCont - keyToRemove
-    //println("newFileCont: " + newFileCont);
     PR(newFileCont,nFiles).toList.sortWith(_._2.sum > _._2.sum)
   }
 
@@ -291,7 +215,7 @@ object pra2 extends App {
       val maxTitle = tf_idfTitleCont.maxBy(_._2);
 
       titleContNoReferenciatMutuament.map { case (otherTitle, otherWordCounts) =>
-        // Calculate tf-idf for the second title (non-mutually referenced)
+        // Calculate tf_idf for the second title (non-mutually referenced)
         val tf_idfOtherTitle = otherWordCounts.map { case (word, count) =>
           (word, count * wordInvValue.getOrElse(word, 1.0))
         }

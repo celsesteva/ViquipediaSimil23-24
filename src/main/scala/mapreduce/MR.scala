@@ -41,7 +41,6 @@ case class toMapper[K1,V1](fitxer: K1, text: List[V1])
 case class fromMapper[K2,V2](intermig: List[(K2,V2)])
 case class toReducer[K2,V2](word:K2, fitxers:List[V2])
 case class fromReducer[K2,V3](finals: (K2,V3))
-
 // Els actors mappers són polimòrfics ja que  reben la funció de mapping polimòrfica que han d'aplicar
 class Mapper[K1,V1,K2,V2](mapping:(K1,List[V1]) => List[(K2,V2)]) extends Actor {
   def receive: Receive = {
@@ -51,6 +50,7 @@ class Mapper[K1,V1,K2,V2](mapping:(K1,List[V1]) => List[(K2,V2)]) extends Actor 
     // i el tipus del valor al missatge toMapper
     case toMapper(clau:K1,valor:List[V1])=>
         sender ! fromMapper(mapping(clau,valor))
+
   }
 }
 
@@ -60,6 +60,7 @@ class Reducer[K2,V2,V3](reducing:(K2,List[V2])=> (K2,V3)) extends Actor {
     // cal anotar també la clau i el valor com hem fet amb els mappers
     case toReducer(clau:K2,valor:List[V2])=>
       sender ! fromReducer(reducing(clau, valor))
+
   }
 }
 
@@ -165,6 +166,9 @@ class MR[K1,V1,K2,V2,V3](
       // Quan ja hem rebut tots els missatges dels mappers:
       if (fromMappersPendents==0)
       {
+        for (mapper <- context.children) {
+          mapper ! PoisonPill // Stop all mapper actors
+        }
         // creem els reducers, tants com entrades al diccionari; fixeu-vos de nou que fem servir context i fem el new
         // pel constructor del Reducer amb paràmetres
         nreducers = Math.max(Math.min(dict.size,maxReducers),1);
@@ -199,6 +203,9 @@ class MR[K1,V1,K2,V2,V3](
 
       // En arribar a 0 enviem a qui ens ha encarregat el MapReduce el resultat. De fet l'està esperant pq haurà fet un ask.
       if (fromReducersPendents == 0) {
+        for (reducer <- context.children) {
+          reducer ! PoisonPill // Stop all reducer actors
+        }
         client ! resultatFinal
         // Ara podem alliberar els recursos dels actors, el propi MapReduce, tots els mappers i els reducers.
         // Fixem-nos que no te sentit que tornem a engegar "aquest mateix" MapReduce.
