@@ -262,7 +262,6 @@ object pra2 extends App {
 
   def inverseDocFreq(contingut: Map[String,List[(Map[String,Int],List[String])]], newNonMutuallyReferenced: Map[String, List[String]]): Map[String,Double] = {
     //ja trec les stop words quan llegeixo el fitxer, no cal fer-ho ara.
-    //ja trec les stop words quan llegeixo el fitxer, no cal fer-ho ara.
     val C: Double = newNonMutuallyReferenced.size;
 
     def mapper(title: String, nothing: List[String]): List[(String,Int)] = {
@@ -279,7 +278,7 @@ object pra2 extends App {
   }
 
   def calcSimilitudDeNoReferenciadesMutuament(query: String): Unit = {
-    val filename ="stopwordscatalanet.txt"; //todo: CHANGE THIS LOL TO A general one.
+    val filename ="stopwordscatalanet.txt";
     val stopWords = ProcessListStrings.llegirFitxer(filename);
     val stopWordsSet = Viqui.normalize(stopWords).toSet
 
